@@ -84,10 +84,6 @@ class ProductServices:
                 saved_characteristics=saved_product_characteristics,
                 parsed_characteristics=parsed_product_characteristics, product_nm_id=saved_product.nm_id
             )
-
-            if product_to_be_saved or chars_to_be_saved:
-                product_to_be_saved.updated_at = datetime.datetime.now()
-
             if product_to_be_saved:
                 products_to_be_saved.append(product_to_be_saved)
             characteristics_to_be_saved += chars_to_be_saved
@@ -140,6 +136,7 @@ class ProductServices:
             saved_product.basicSale = parsed_product.basicSale
 
         if actions:
+            saved_product.updated_at = datetime.datetime.now()
             return saved_product, [
                 ProductHistory(
                     nm_id=saved_product.nm_id,
