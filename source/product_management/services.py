@@ -187,7 +187,7 @@ class ProductServices:
                 """НУЖНО ДОБАВИТЬ ФУНКЦИЮ УДАЛЕНИЯ УДАЛЕННОГО С ВБ ХАРАКТЕРИСТИКИ"""
                 continue
 
-            if saved_characteristic.name != parsed_characteristic.name:
+            if saved_characteristic.value != parsed_characteristic.value:
                 actions.append(f'Поменялось значение характеристики {saved_characteristic.name} с {saved_characteristic.value} на {parsed_characteristic.value}')
                 saved_characteristic.value = parsed_characteristic.value
                 characteristics_to_be_saved.append(saved_characteristic)
