@@ -234,7 +234,14 @@ class ProductServices:
             for saved_order in saved_orders:
                 saved_orders_dict[saved_order.orderUid] = True
 
-            orders = [order for order in orders if not saved_orders_dict.get(order.orderUid)]
+            saved_products = await self.product_queries.get_products_by_shop_id(shop_id=shop.id)
+            saved_products_dict = dict()
+
+            for saved_product in saved_products:
+                saved_products_dict[saved_product.nm_id] = True
+
+            orders = [order for order in orders
+                      if not saved_orders_dict.get(order.orderUid) and if not saved_products_dict.get(order.nm_id)]
 
             history = [
                 ProductHistory(
