@@ -1,5 +1,5 @@
 from sqladmin import ModelView
-from source.product_management.models import Product, ProductHistory, Characteristic, Shop
+from source.product_management.models import Product, ProductHistory, Characteristic, Shop, Order
 
 
 class ShopAdmin(ModelView, model=Shop):
@@ -24,3 +24,8 @@ class ProductHistoryAdmin(ModelView, model=ProductHistory):
     column_searchable_list = ['nm_id', 'action']
     column_formatters = {'action': lambda item, _: item.action[:60]}
     column_default_sort = [(ProductHistory.created_at, True)]
+
+
+class OrderAdmin(ModelView, model=Order):
+    column_list = ['orderUid', 'nm_id']
+    column_searchable_list = ['orderUid', 'nm_id']
