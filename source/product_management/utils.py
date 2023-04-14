@@ -1,13 +1,14 @@
 from source.core.base_utils import BaseUtils
 import asyncio
 
-from source.product_management.models import Product, Characteristic
+from source.product_management.models import Product, Characteristic, Order
 
 
 class ProductUtils(BaseUtils):
 
     @staticmethod
-    def prepare_products_for_saving(products: list[dict]) -> tuple:
+    def prepare_products_for_saving(
+            products: list[dict], shop_id: int = None, shops_supplier: str = None) -> tuple:
         products_to_be_saved = []
         characteristics_to_be_saved = []
         for product in products:
@@ -25,7 +26,9 @@ class ProductUtils(BaseUtils):
                 priceU=product['detail'].get('priceU', 0) // 100,
                 salePriceU=product['detail'].get('salePriceU', 0) // 100,
                 clientSale=extended.get('clientSale'),
-                basicSale=extended.get('basicSale')
+                basicSale=extended.get('basicSale'),
+                shop_id=shop_id,
+                shops_supplier=shops_supplier
             )
             products_to_be_saved.append(product_to_be_saved)
             for option in product['card'].get('options', []):
@@ -35,6 +38,35 @@ class ProductUtils(BaseUtils):
                     product_nm_id=product_to_be_saved.nm_id
                 ))
         return products_to_be_saved, characteristics_to_be_saved
+
+    @staticmethod
+    def prepare_orders_for_saving(orders: list[dict], shop_id: int) -> list[Order]:
+        return [
+            Order(
+                orderUid=order.get('orderUid'),
+                nm_id=order.get('nmId'),
+                shop_id=shop_id
+            )
+            for order in orders
+        ]
+
+    @staticmethod
+    def filter_recently_added_orders(orders: list[Order]) -> list[Order]:
+        pass
+
+
+class WbApiUtils(BaseUtils):
+
+    @staticmethod
+    def auth(api_key: str) -> dict:
+        return {
+            'Authorization': api_key
+        }
+
+    async def get_shops_orders(self, token_auth: dict):
+        url = 'https://suppliers-api.wildberries.ru/api/v3/orders/new'
+        data = await self.make_get_request(url=url, headers=token_auth)
+        return data.get('orders', [])
 
 
 class ParsingUtils(BaseUtils):

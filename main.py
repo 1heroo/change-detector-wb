@@ -4,14 +4,15 @@ from sqladmin import Admin
 import uvicorn
 
 from source.db.db import async_engine
-from source.product_management.admin import ProductAdmin, ProductHistoryAdmin, CharacteristicAdmin
-
+from source.product_management.admin import ProductAdmin, ProductHistoryAdmin, CharacteristicAdmin, ShopAdmin
 
 app = FastAPI(title='Мониторинг товаров WB')
 app.include_router(router=main_router)
 
 
 admin = Admin(app=app, engine=async_engine)
+
+admin.add_view(view=ShopAdmin)
 admin.add_view(view=ProductAdmin)
 admin.add_view(view=CharacteristicAdmin)
 admin.add_view(view=ProductHistoryAdmin)

@@ -1,5 +1,10 @@
 from sqladmin import ModelView
-from source.product_management.models import Product, ProductHistory, Characteristic
+from source.product_management.models import Product, ProductHistory, Characteristic, Shop
+
+
+class ShopAdmin(ModelView, model=Shop):
+    column_list = ['id', 'name', 'supplier', 'is_active']
+    column_searchable_list = ['name']
 
 
 class ProductAdmin(ModelView, model=Product):

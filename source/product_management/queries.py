@@ -1,7 +1,25 @@
 from source.db.db import async_session
 import sqlalchemy as sa
-from source.product_management.models import Product, Characteristic, ProductHistory
+from source.product_management.models import Product, Characteristic, ProductHistory, Shop, Order
 from source.db.queries import BaseQueries
+
+
+class ShopQueries(BaseQueries):
+    model = Shop
+
+    async def fetch_all(self) -> list[Shop]:
+        async with async_session() as session:
+            result = await session.execute(
+                sa.select(self.model)
+            )
+            return result.scalars().all()
+
+    async def get_shop_by_id(self, shop_id: int) -> Shop | None:
+        async with async_session() as session:
+            result = await session.execute(
+                sa.select(self.model).where(self.model.id == shop_id)
+            )
+            return result.scalars().first()
 
 
 class ProductQueries(BaseQueries):
@@ -15,11 +33,18 @@ class ProductQueries(BaseQueries):
             )
             return result.scalars().all()
 
+    async def get_products_by_shop_id(self, shop_id: int):
+        async with async_session() as session:
+            result = await session.execute(
+                sa.select(self.model).where(self.model.shop_id == shop_id)
+            )
+            return result.scalars().all()
+
 
 class CharacteristicQueries(BaseQueries):
     model = Characteristic
 
-    async def fetch_all(self) -> list[Product]:
+    async def fetch_all(self) -> list[Characteristic]:
         async with async_session() as session:
             result = await session.execute(
                 sa.select(self.model)
@@ -34,5 +59,23 @@ class ProductHistoryQueries(BaseQueries):
         async with async_session() as session:
             result = await session.execute(
                 sa.select(self.model)
+            )
+            return result.scalars().all()
+
+
+class OrderQueries(BaseQueries):
+    model = Order
+
+    async def fetch_all(self) -> list[Order]:
+        async with async_session() as session:
+            result = await session.execute(
+                sa.select(self.model)
+            )
+            return result.scalars().all()
+
+    async def get_orders_by_shop_id(self, shop_id: int) -> list[Order]:
+        async with async_session() as session:
+            result = await session.execute(
+                sa.select(self.model).where(self.model.shop_id == shop_id)
             )
             return result.scalars().all()

@@ -4,8 +4,9 @@ import pandas as pd
 
 from source.core.advertisement_api import AdvertisementApiUtils
 from source.product_management.models import Product, Characteristic, ProductHistory
-from source.product_management.queries import ProductQueries, CharacteristicQueries, ProductHistoryQueries
-from source.product_management.utils import ProductUtils, ParsingUtils
+from source.product_management.queries import ProductQueries, CharacteristicQueries, ProductHistoryQueries, ShopQueries, \
+    OrderQueries
+from source.product_management.utils import ProductUtils, ParsingUtils, WbApiUtils
 
 
 class ProductServices:
@@ -13,10 +14,13 @@ class ProductServices:
     def __init__(self):
         self.product_utils = ProductUtils()
         self.parsing_utils = ParsingUtils()
+        self.wb_api_utils = WbApiUtils()
 
+        self.shop_queries = ShopQueries()
         self.product_queries = ProductQueries()
         self.characteristic_queries = CharacteristicQueries()
         self.history_queries = ProductHistoryQueries()
+        self.order_queries = OrderQueries()
 
         self.advertisement_api_utils = AdvertisementApiUtils()
 
@@ -86,7 +90,10 @@ class ProductServices:
 
             chars_to_be_saved, char_history = await self.detect_change_in_characteristics(
                 saved_characteristics=saved_product_characteristics,
-                parsed_characteristics=parsed_product_characteristics, product_nm_id=saved_product.nm_id
+                parsed_characteristics=parsed_product_characteristics,
+                product_nm_id=saved_product.nm_id,
+                shop_id=saved_product.shop_id,
+                shops_supplier=saved_product.shops_supplier,
             )
             if product_to_be_saved:
                 products_to_be_saved.append(product_to_be_saved)
@@ -145,17 +152,22 @@ class ProductServices:
                 ProductHistory(
                     nm_id=saved_product.nm_id,
                     action=action,
-                    created_at=datetime.datetime.now()
+                    created_at=datetime.datetime.now(),
+                    shop_id=saved_product.shop_id,
+                    shops_supplier=saved_product.shops_supplier,
                 )
                 for action in actions
             ]
         return None, []
 
     @staticmethod
-    async def detect_change_in_characteristics(saved_characteristics: list[Characteristic],
-                                               parsed_characteristics: list[Characteristic], product_nm_id: int) -> list[ProductHistory]:
-        # parsed_characteristics += [Characteristic(name='asd', value='asd', product_nm_id=39375118)]
-        # saved_characteristics += [Characteristic(name='lol', value='lol', product_nm_id=39375118)]
+    async def detect_change_in_characteristics(
+            saved_characteristics: list[Characteristic],
+            parsed_characteristics: list[Characteristic],
+            product_nm_id: int,
+            shop_id: int,
+            shops_supplier: str,
+    ) -> list[ProductHistory]:
         saved_characteristics_df = pd.DataFrame([
             {
                 'nm_id': characteristic.product_nm_id,
@@ -201,19 +213,56 @@ class ProductServices:
                 ProductHistory(
                     nm_id=product_nm_id,
                     action=action,
-                    created_at=datetime.datetime.now()
+                    created_at=datetime.datetime.now(),
+                    shop_id=shop_id,
+                    shops_supplier=shops_supplier
                 )
                 for action in actions
             ]
         return characteristics_to_be_saved, []
 
+    async def order_monitoring(self):
+        shops = await self.shop_queries.fetch_all()
+
+        for shop in shops:
+            standard_auth = self.wb_api_utils.auth(api_key=shop.api_token_standard)
+            orders = await self.wb_api_utils.get_shops_orders(token_auth=standard_auth)
+            orders = self.product_utils.prepare_orders_for_saving(orders=orders, shop_id=shop.id)
+
+            saved_orders = await self.order_queries.get_orders_by_shop_id(shop_id=shop.id)
+            saved_orders_dict = dict()
+            for saved_order in saved_orders:
+                saved_orders_dict[saved_order.orderUid] = True
+
+            orders = [order for order in orders if not saved_orders_dict.get(order.orderUid)]
+
+            history = [
+                ProductHistory(
+                    nm_id=order.nm_id,
+                    action=f'Новое сборочное задание у товара с артикулом {order.nm_id}',
+                    created_at=datetime.datetime.now(),
+                    shop_id=shop.id,
+                    shops_supplier=shop.supplier
+                )
+                for order in orders
+            ]
+            if history:
+                await self.advertisement_api_utils.send_detected_changes(detected_changes=history)
+
+                await self.history_queries.save_in_db(instances=history, many=True)
+                await self.order_queries.save_in_db(instances=orders, many=True)
+
 
 class ProductImportServices(ProductServices):
 
-    async def import_products_by_excel(self, df: pd.DataFrame, nm_id_column: str) -> None:
+    async def import_products_by_excel(self, df: pd.DataFrame, nm_id_column: str, shop_id: int) -> None:
+        shop = await self.shop_queries.get_shop_by_id(shop_id=shop_id)
+        if not shop:
+            return
         nm_ids = list(df[nm_id_column])
         products = await self.parsing_utils.get_detail_by_nms(nms=nm_ids)
-        products, characteristics = self.product_utils.prepare_products_for_saving(products=products)
+        products, characteristics = self.product_utils.prepare_products_for_saving(
+            products=products, shop_id=shop_id, shops_supplier=shop.supplier)
         await self.product_queries.save_in_db(instances=products, many=True)
         await self.product_queries.save_in_db(instances=characteristics, many=True)
 
