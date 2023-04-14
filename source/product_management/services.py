@@ -241,7 +241,7 @@ class ProductServices:
                 saved_products_dict[saved_product.nm_id] = True
 
             orders = [order for order in orders
-                      if not saved_orders_dict.get(order.orderUid) and if not saved_products_dict.get(order.nm_id)]
+                      if not saved_orders_dict.get(order.orderUid) and not saved_products_dict.get(order.nm_id)]
 
             history = [
                 ProductHistory(
