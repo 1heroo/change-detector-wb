@@ -2,6 +2,7 @@ import datetime
 
 import pandas as pd
 
+from source.core.advertisement_api import AdvertisementApiUtils
 from source.product_management.models import Product, Characteristic, ProductHistory
 from source.product_management.queries import ProductQueries, CharacteristicQueries, ProductHistoryQueries
 from source.product_management.utils import ProductUtils, ParsingUtils
@@ -16,6 +17,8 @@ class ProductServices:
         self.product_queries = ProductQueries()
         self.characteristic_queries = CharacteristicQueries()
         self.history_queries = ProductHistoryQueries()
+
+        self.advertisement_api_utils = AdvertisementApiUtils()
 
     async def product_monitoring(self):
         saved_products = await self.product_queries.fetch_all()
@@ -38,6 +41,7 @@ class ProductServices:
         if characteristics:
             await self.characteristic_queries.save_in_db(characteristics, many=True)
         if product_histories:
+            await self.advertisement_api_utils.send_detected_changes(detected_changes=product_histories)
             await self.history_queries.save_in_db(product_histories, many=True)
 
     async def detect_changes(

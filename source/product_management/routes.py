@@ -1,6 +1,7 @@
 import pandas as pd
 from fastapi import APIRouter, File
 
+from source.core.advertisement_api import AdvertisementApiUtils
 from source.product_management.services import ProductImportServices, ProductServices
 
 router = APIRouter(prefix='/product-management', tags=['Product Management'])
@@ -19,3 +20,9 @@ async def import_products_by_excel(file: bytes = File()):
     df = pd.read_excel(file)
     nm_id_column = df['Артикул WB'].name
     await product_import_services.import_products_by_excel(df=df, nm_id_column=nm_id_column)
+
+
+@router.get('/')
+async def test():
+    utils = AdvertisementApiUtils()
+    await utils.send_detected_changes(detected_changes=[])
