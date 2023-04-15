@@ -225,10 +225,17 @@ class ProductServices:
         shops = await self.shop_queries.fetch_all()
 
         for shop in shops:
+            statistic_auth = self.wb_api_utils.auth(api_key=shop.api_token_statistic)
             standard_auth = self.wb_api_utils.auth(api_key=shop.api_token_standard)
+
             orders = await self.wb_api_utils.get_shops_orders(token_auth=standard_auth)
             orders = self.product_utils.prepare_orders_for_saving(orders=orders, shop_id=shop.id)
 
+            fbo_orders = await self.wb_api_utils.get_shops_orders_fbo(token_auth=statistic_auth)
+            fbo_orders = self.product_utils.prepare_orders_for_saving(
+                orders=fbo_orders, shop_id=shop.id, orderUid='srid')
+
+            orders += fbo_orders
             saved_orders = await self.order_queries.get_orders_by_shop_id(shop_id=shop.id)
             saved_orders_dict = dict()
             for saved_order in saved_orders:
@@ -243,16 +250,16 @@ class ProductServices:
             orders = [order for order in orders
                       if not saved_orders_dict.get(order.orderUid) and not saved_products_dict.get(order.nm_id)]
 
-            history = [
-                ProductHistory(
+            history = []
+            for order in orders:
+                history.append(ProductHistory(
                     nm_id=order.nm_id,
-                    action=f'Новое сборочное задание у товара с артикулом {order.nm_id}',
+                    action=f'Новое сборочное задание у товара с артикулом {order.nm_id}'
+                    if 'canceled' not in order.orderUid else f'Отменен заказ у товара с артикулом {order.nm_id}',
                     created_at=datetime.datetime.now(),
                     shop_id=shop.id,
                     shops_supplier=shop.supplier
-                )
-                for order in orders
-            ]
+                ))
             if history:
                 await self.advertisement_api_utils.send_detected_changes(detected_changes=history)
 

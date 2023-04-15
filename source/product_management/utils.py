@@ -1,3 +1,5 @@
+import datetime
+
 from source.core.base_utils import BaseUtils
 import asyncio
 
@@ -40,10 +42,10 @@ class ProductUtils(BaseUtils):
         return products_to_be_saved, characteristics_to_be_saved
 
     @staticmethod
-    def prepare_orders_for_saving(orders: list[dict], shop_id: int) -> list[Order]:
+    def prepare_orders_for_saving(orders: list[dict], shop_id: int, orderUid: str = 'orderUid') -> list[Order]:
         return [
             Order(
-                orderUid=order.get('orderUid'),
+                orderUid=order.get(orderUid) + 'canceled' if order.get('isCancel') else order.get(orderUid),
                 nm_id=order.get('nmId'),
                 shop_id=shop_id
             )
@@ -63,10 +65,16 @@ class WbApiUtils(BaseUtils):
             'Authorization': api_key
         }
 
-    async def get_shops_orders(self, token_auth: dict):
+    async def get_shops_orders(self, token_auth: dict) -> list[dict]:
         url = 'https://suppliers-api.wildberries.ru/api/v3/orders/new'
         data = await self.make_get_request(url=url, headers=token_auth)
         return data.get('orders', [])
+
+    async def get_shops_orders_fbo(self, token_auth: dict) -> list[dict]:
+        dateFrom = datetime.datetime.now() - datetime.timedelta(weeks=4)
+        url = f'https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom={str(dateFrom).replace(" ", "T")}'
+        data = await self.make_get_request(url=url, headers=token_auth)
+        return data
 
 
 class ParsingUtils(BaseUtils):
