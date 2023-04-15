@@ -71,7 +71,7 @@ class WbApiUtils(BaseUtils):
         return data.get('orders', [])
 
     async def get_shops_orders_fbo(self, token_auth: dict) -> list[dict]:
-        dateFrom = datetime.datetime.now() - datetime.timedelta(weeks=4)
+        dateFrom = datetime.datetime.now() - datetime.timedelta(minutes=40)
         url = f'https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom={str(dateFrom).replace(" ", "T")}'
         data = await self.make_get_request(url=url, headers=token_auth)
         return data
