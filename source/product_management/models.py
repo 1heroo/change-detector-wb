@@ -100,6 +100,7 @@ class Order(Base):
     orderUid = sa.Column(sa.String)
     nm_id = sa.Column(sa.BIGINT)
 
+    status = sa.Column(sa.String)
     shop_id = sa.Column(sa.Integer, sa.ForeignKey('shops.id'))
     shop = relationship('Shop', back_populates='orders')
 

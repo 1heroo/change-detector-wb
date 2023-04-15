@@ -42,15 +42,28 @@ class ProductUtils(BaseUtils):
         return products_to_be_saved, characteristics_to_be_saved
 
     @staticmethod
-    def prepare_orders_for_saving(orders: list[dict], shop_id: int, orderUid: str = 'orderUid') -> list[Order]:
-        return [
-            Order(
-                orderUid=order.get(orderUid) + 'canceled' if order.get('isCancel') else order.get(orderUid),
+    def prepare_orders_for_saving(orders: list[dict], shop_id: int, object: str) -> list[Order]:
+        output_data = []
+        canceled = ''
+        match object:
+            case 'id':
+                status = 'new'
+            case 'srid':
+                status = 'complete',
+                canceled = ' canceled'
+            case 'saleID':
+                status = 'complete'
+            case other:
+                return output_data
+
+        for order in orders:
+            output_data.append(Order(
+                orderUid=order.get(object) + canceled,
                 nm_id=order.get('nmId'),
+                status=status,
                 shop_id=shop_id
-            )
-            for order in orders
-        ]
+            ))
+        return output_data
 
     @staticmethod
     def filter_recently_added_orders(orders: list[Order]) -> list[Order]:
@@ -74,7 +87,19 @@ class WbApiUtils(BaseUtils):
         dateFrom = datetime.datetime.now() - datetime.timedelta(minutes=40)
         url = f'https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom={str(dateFrom).replace(" ", "T")}'
         data = await self.make_get_request(url=url, headers=token_auth)
-        return data
+        return data if data else []
+
+    async def get_shops_sales(self, token_auth: dict) -> list[dict]:
+        dateFrom = datetime.datetime.now() - datetime.timedelta(minutes=40)
+        url = f'https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom={str(dateFrom).replace(" ", "T")}'
+        data = await self.make_get_request(url=url, headers=token_auth)
+        return data if data else []
+
+    async def get_order_statuses(self, token_auth: dict, order_ids: list[int]) -> list[dict]:
+        orders_ids = order_ids[1000:]
+        url = 'https://suppliers-api.wildberries.ru/api/v3/orders/status'
+        data = await self.make_post_request(headers=token_auth, url=url, payload=dict(orders=orders_ids))
+        return data.get('orders', [])
 
 
 class ParsingUtils(BaseUtils):

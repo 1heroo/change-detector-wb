@@ -11,7 +11,7 @@ class BaseUtils:
         session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=timeout_seconds, sock_read=timeout_seconds)
         async with aiohttp.ClientSession(trust_env=True, headers=headers, timeout=session_timeout) as session:
             async with session.get(url=url) as response:
-
+                print(response.status)
                 if response.status == 200:
                     return True if no_json else json.loads(await response.text())
 

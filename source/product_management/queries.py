@@ -79,3 +79,14 @@ class OrderQueries(BaseQueries):
                 sa.select(self.model).where(self.model.shop_id == shop_id)
             )
             return result.scalars().all()
+
+    async def get_not_completed_and_canceled_orders_by_shop_id(self, shop_id: int) -> list[Order]:
+        async with async_session() as session:
+            result = await session.execute(
+                sa.select(self.model)
+                .where(self.model.status != 'complete')
+                .where(self.model.status != 'cancel')
+                .where(self.model.shop_id == shop_id)
+            )
+            return result.scalars().all()
+        

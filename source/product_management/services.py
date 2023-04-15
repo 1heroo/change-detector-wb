@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 
 from source.core.advertisement_api import AdvertisementApiUtils
-from source.product_management.models import Product, Characteristic, ProductHistory
+from source.product_management.models import Product, Characteristic, ProductHistory, Order
 from source.product_management.queries import ProductQueries, CharacteristicQueries, ProductHistoryQueries, ShopQueries, \
     OrderQueries
 from source.product_management.utils import ProductUtils, ParsingUtils, WbApiUtils
@@ -229,13 +229,17 @@ class ProductServices:
             standard_auth = self.wb_api_utils.auth(api_key=shop.api_token_standard)
 
             orders = await self.wb_api_utils.get_shops_orders(token_auth=standard_auth)
-            orders = self.product_utils.prepare_orders_for_saving(orders=orders, shop_id=shop.id)
+            orders = self.product_utils.prepare_orders_for_saving(orders=orders, shop_id=shop.id, object='id')
 
             fbo_orders = await self.wb_api_utils.get_shops_orders_fbo(token_auth=statistic_auth)
             fbo_orders = self.product_utils.prepare_orders_for_saving(
-                orders=fbo_orders, shop_id=shop.id, orderUid='srid')
+                orders=fbo_orders, shop_id=shop.id, object='srid')
 
-            orders += fbo_orders
+            sales = await self.wb_api_utils.get_shops_sales(token_auth=statistic_auth)
+            sales = self.product_utils.prepare_orders_for_saving(orders=sales, shop_id=shop.id, object='saleID')
+
+            orders += fbo_orders + sales
+
             saved_orders = await self.order_queries.get_orders_by_shop_id(shop_id=shop.id)
             saved_orders_dict = dict()
             for saved_order in saved_orders:
@@ -252,10 +256,18 @@ class ProductServices:
 
             history = []
             for order in orders:
+                if order.status == 'new':
+                    action = f'Новое сборочное задание у товара с артикулом {order.nm_id}'
+                elif order.orderUid[0] in ['S', 'R']:
+                    action = f'Продажа товара с артикулом {order.nm_id}' if order.orderUid[0] == 'S' else \
+                        f"Возврат товара с артикулом {order.nm_id}"
+                else:
+                    action = f'Новый заказ у товара с артикулом {order.nm_id}' if 'canceled' not in order.orderUid else \
+                        f'Отмена заказа у товара с артикулом {order.nm_id}'
+
                 history.append(ProductHistory(
                     nm_id=order.nm_id,
-                    action=f'Новое сборочное задание у товара с артикулом {order.nm_id}'
-                    if 'canceled' not in order.orderUid else f'Отменен заказ у товара с артикулом {order.nm_id}',
+                    action=action,
                     created_at=datetime.datetime.now(),
                     shop_id=shop.id,
                     shops_supplier=shop.supplier
@@ -265,6 +277,58 @@ class ProductServices:
 
                 await self.history_queries.save_in_db(instances=history, many=True)
                 await self.order_queries.save_in_db(instances=orders, many=True)
+
+    async def order_status_monitoring(self):
+        for shop in await self.shop_queries.fetch_all():
+            standard_auth = self.wb_api_utils.auth(api_key=shop.api_token_standard)
+            orders = await self.order_queries.get_not_completed_and_canceled_orders_by_shop_id(shop_id=shop.id)
+
+            order_ids = []
+            valid_orders = []
+            for order in valid_orders:
+                try:
+                    order_id = int(order.orderUid)
+                    order_ids.append(order_id)
+                    orders.append(order)
+                except ValueError:
+                    continue
+            statuses = await self.wb_api_utils.get_order_statuses(order_ids=order_ids, token_auth=standard_auth)
+
+            orders_df = pd.DataFrame([
+                {'order_id': int(order.orderUid), 'saved_order': order}
+                for order in valid_orders
+            ])
+            statuses_df = pd.DataFrame([
+                {'order_id': status.get('id', 0), 'status': status}
+                for status in statuses
+            ])
+            if statuses_df.empty or orders_df.empty:
+                continue
+
+            df = pd.merge(orders_df, statuses_df, how='inner', left_on='order_id', right_on='order_id')
+
+            history = []
+            orders_to_be_saved = []
+            for index in df.index:
+                saved_order: Order = df['saved_order'][index]
+                status: str = df['status'][index].get('supplierStatus', '')
+
+                if saved_order.status != status:
+                    history.append(ProductHistory(
+                        nm_id=saved_order.nm_id,
+                        action=f'Изменился статус сборочного задания с "{saved_order.status}" на "{status}"',
+                        created_at=datetime.datetime.now(),
+                        shops_supplier=shop.supplier,
+                        shop_id=shop.id,
+                    ))
+                    saved_order.status = status
+                    orders_to_be_saved.append(saved_order)
+
+            if history:
+                await self.advertisement_api_utils.send_detected_changes(history)
+                await self.history_queries.save_in_db(instances=history, many=True)
+                await self.order_queries.save_in_db(instances=orders_to_be_saved, many=True)
+
 
 
 class ProductImportServices(ProductServices):
