@@ -58,7 +58,7 @@ class ProductUtils(BaseUtils):
 
         for order in orders:
             output_data.append(Order(
-                orderUid=order.get(object) + canceled,
+                orderUid=str(order.get(object)) + canceled,
                 nm_id=order.get('nmId'),
                 status=status,
                 shop_id=shop_id
