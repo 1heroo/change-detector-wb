@@ -49,7 +49,7 @@ class ProductUtils(BaseUtils):
             case 'id':
                 status = 'new'
             case 'srid':
-                status = 'complete',
+                status = 'complete'
                 canceled = ' canceled'
             case 'saleID':
                 status = 'complete'
