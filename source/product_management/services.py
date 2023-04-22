@@ -36,7 +36,7 @@ class ProductServices:
         parsed_products, parsed_characteristics = self.product_utils.prepare_products_for_saving(
             products=parsed_products)
 
-        products, characteristics, product_histories = await self.detect_changes(
+        products, characteristics, chars_to_be_deleted, product_histories = await self.detect_changes(
             saved_products=saved_products, saved_characteristics=saved_characteristics,
             parsed_products=parsed_products, parsed_characteristics=parsed_characteristics
         )
@@ -44,8 +44,10 @@ class ProductServices:
             await self.product_queries.save_in_db(products, many=True)
         if characteristics:
             await self.characteristic_queries.save_in_db(characteristics, many=True)
+        if chars_to_be_deleted:
+            await self.characteristic_queries.delete_instances(instances=chars_to_be_deleted)
         if product_histories:
-            await self.advertisement_api_utils.send_detected_changes(detected_changes=product_histories)
+            # await self.advertisement_api_utils.send_detected_changes(detected_changes=product_histories)
             await self.history_queries.save_in_db(product_histories, many=True)
 
     async def detect_changes(
@@ -78,6 +80,7 @@ class ProductServices:
 
         products_to_be_saved = []
         characteristics_to_be_saved = []
+        characteristics_to_be_deleted = []
         product_history_to_be_saved = []
         for index in df.index:
             saved_product: Product = df['saved_product'][index]
@@ -88,7 +91,7 @@ class ProductServices:
             product_to_be_saved, product_history_list = await self.detect_change_in_product(
                 saved_product=saved_product, parsed_product=parsed_product)
 
-            chars_to_be_saved, char_history = await self.detect_change_in_characteristics(
+            chars_to_be_saved, chars_to_be_deleted, char_history = await self.detect_change_in_characteristics(
                 saved_characteristics=saved_product_characteristics,
                 parsed_characteristics=parsed_product_characteristics,
                 product_nm_id=saved_product.nm_id,
@@ -97,10 +100,12 @@ class ProductServices:
             )
             if product_to_be_saved:
                 products_to_be_saved.append(product_to_be_saved)
+
             characteristics_to_be_saved += chars_to_be_saved
+            characteristics_to_be_deleted += chars_to_be_deleted
             product_history_to_be_saved += product_history_list + char_history
 
-        return products_to_be_saved, characteristics_to_be_saved, product_history_to_be_saved
+        return products_to_be_saved, characteristics_to_be_saved, characteristics_to_be_deleted, product_history_to_be_saved
 
     @staticmethod
     async def detect_change_in_product(saved_product: Product, parsed_product: Product) -> list[ProductHistory]:
@@ -183,10 +188,11 @@ class ProductServices:
             }
             for characteristic in parsed_characteristics
         ])
-        df = pd.merge(saved_characteristics_df, parsed_characteristics_df, how='right',
+        df = pd.merge(saved_characteristics_df, parsed_characteristics_df, how='outer',
                       left_on=['nm_id', 'keyword'], right_on=['nm_id', 'keyword'])
 
         characteristics_to_be_saved = []
+        characteristics_to_be_deleted = []
         actions = []
 
         for index in df.index:
@@ -200,7 +206,7 @@ class ProductServices:
 
             if pd.isna(parsed_characteristic):
                 actions.append(f'Удалена характеристика товара с названием {saved_characteristic.name} и со значением {saved_characteristic.value}')
-                """НУЖНО ДОБАВИТЬ ФУНКЦИЮ УДАЛЕНИЯ УДАЛЕННОГО С ВБ ХАРАКТЕРИСТИКИ"""
+                characteristics_to_be_deleted.append(saved_characteristic)
                 continue
 
             if saved_characteristic.value != parsed_characteristic.value:
@@ -209,7 +215,7 @@ class ProductServices:
                 characteristics_to_be_saved.append(saved_characteristic)
 
         if actions:
-            return characteristics_to_be_saved, [
+            return characteristics_to_be_saved, characteristics_to_be_deleted, [
                 ProductHistory(
                     nm_id=product_nm_id,
                     action=action,
@@ -219,7 +225,7 @@ class ProductServices:
                 )
                 for action in actions
             ]
-        return characteristics_to_be_saved, []
+        return characteristics_to_be_saved, characteristics_to_be_deleted, []
 
     async def order_monitoring(self):
         shops = await self.shop_queries.fetch_all()
@@ -328,7 +334,6 @@ class ProductServices:
                 await self.advertisement_api_utils.send_detected_changes(history)
                 await self.history_queries.save_in_db(instances=history, many=True)
                 await self.order_queries.save_in_db(instances=orders_to_be_saved, many=True)
-
 
 
 class ProductImportServices(ProductServices):

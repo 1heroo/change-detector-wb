@@ -51,6 +51,10 @@ class CharacteristicQueries(BaseQueries):
             )
             return result.scalars().all()
 
+    async def delete_instances(self, instances: list[Characteristic]) -> None:
+        for instance in instances:
+            await self.delete_instance(instance=instance)
+
 
 class ProductHistoryQueries(BaseQueries):
     model = ProductHistory
