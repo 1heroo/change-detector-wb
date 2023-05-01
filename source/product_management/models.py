@@ -81,6 +81,7 @@ class ProductHistory(Base):
     nm_id = sa.Column(sa.BIGINT)
     action = sa.Column(sa.String)
     created_at = sa.Column(sa.DateTime)
+    price_for_sale = sa.Column(sa.Integer)
 
     shops_supplier = sa.Column(sa.String)
     shop_id = sa.Column(sa.Integer, sa.ForeignKey('shops.id'))
@@ -99,6 +100,7 @@ class Order(Base):
     id = sa.Column(sa.Integer, primary_key=True)
     orderUid = sa.Column(sa.String)
     nm_id = sa.Column(sa.BIGINT)
+    price_for_sale = sa.Column(sa.Integer)
 
     status = sa.Column(sa.String)
     shop_id = sa.Column(sa.Integer, sa.ForeignKey('shops.id'))

@@ -322,6 +322,7 @@ class ProductServices:
                 if saved_order.status != status:
                     history.append(ProductHistory(
                         nm_id=saved_order.nm_id,
+                        price_for_sale=saved_order.price_for_sale,
                         action=f'Изменился статус сборочного задания с "{saved_order.status}" на "{status}"',
                         created_at=datetime.datetime.now(),
                         shops_supplier=shop.supplier,

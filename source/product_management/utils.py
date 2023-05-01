@@ -61,6 +61,7 @@ class ProductUtils(BaseUtils):
                 orderUid=str(order.get(object)) + canceled,
                 nm_id=order.get('nmId'),
                 status=status,
+                price_for_sale=order.get('finishedPrice'),
                 shop_id=shop_id
             ))
         return output_data
